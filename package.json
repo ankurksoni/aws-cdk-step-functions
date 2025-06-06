@@ -1,0 +1,29 @@
+{
+  "name": "turbo-data-migration",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "check-types": "turbo run check-types",
+    "clean": "turbo run clean",
+    "cdk:synth": "cd apps/infrastructure && npm run cdk synth",
+    "cdk:deploy": "cd apps/infrastructure && npm run cdk deploy",
+    "cdk:destroy": "cd apps/infrastructure && npm run cdk destroy",
+    "install:all": "npm install && turbo run build"
+  },
+  "devDependencies": {
+    "prettier": "^3.5.3",
+    "turbo": "^2.5.4",
+    "typescript": "5.8.2"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "npm@10.9.2",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

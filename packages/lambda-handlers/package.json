@@ -1,0 +1,29 @@
+{
+  "name": "@repo/lambda-handlers",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@repo/types": "*",
+    "@repo/step-function-core": "*",
+    "@aws-lambda-powertools/logger": "^1.17.0",
+    "@aws-lambda-powertools/tracer": "^1.17.0"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "*",
+    "@types/aws-lambda": "^8.10.119",
+    "typescript": "^5.0.0"
+  }
+} 
