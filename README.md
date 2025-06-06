@@ -55,7 +55,7 @@ The Lambda function `workflowHandler` processes the input:
 
 **📍 Code Reference:**
 ```typescript
-// packages/lambda-handlers/src/index.ts - Line 45
+// packages/lambda-handlers/src/index.ts - Line 62
 export const workflowHandler: Handler<WorkflowInput, WorkflowOutput> = async (
   event,
   context
@@ -121,7 +121,7 @@ The actual business logic executes here (currently a simple simulation):
 
 **📍 Code Reference:**
 ```typescript
-// packages/lambda-handlers/src/index.ts - Line 35
+// packages/lambda-handlers/src/index.ts - Line 37
 const executeWorkflow = async (input: WorkflowInput): Promise<WorkflowOutput> => {
   console.log('Executing data migration workflow', { 
     executionId: input.executionId,
@@ -210,14 +210,13 @@ const errorHandler = new stepfunctions.Fail(this, 'WorkflowFailed', {
 ## 📁 Project Structure
 
 ```
-turbo-data-migration/
+aws-cdk-step-functions/
 ├── apps/
 │   └── infrastructure/          # AWS CDK Infrastructure
 ├── packages/
-│   ├── lambda-handlers/         # Lambda function code
-│   ├── types/                   # TypeScript interfaces
-│   ├── step-function-core/      # Business logic (unused in current simplified version)
-│   └── typescript-config/       # Shared TS config
+│   ├── lambda-handlers/         # Self-contained Lambda function
+│   ├── types/                   # Shared TypeScript interfaces
+│   └── typescript-config/       # Shared TS configuration
 └── turbo.json                   # Turbo build configuration
 ```
 
@@ -247,25 +246,51 @@ npx cdk deploy
 ## 🔍 Monitoring & Logs
 
 ### CloudWatch Log Groups
-The deployment creates dedicated log groups:
+The deployment creates dedicated log groups with 1-week retention:
 
 **📍 Code Reference:**
 ```typescript
-// apps/infrastructure/lib/infrastructure-stack.ts - Line 52
+// apps/infrastructure/lib/infrastructure-stack.ts - Line 57
 const lambdaLogGroup = new logs.LogGroup(this, 'WorkflowLambdaLogGroup', {
   logGroupName: '/aws/lambda/WorkflowLambda',
   retention: logs.RetentionDays.ONE_WEEK,
+  removalPolicy: cdk.RemovalPolicy.DESTROY,
 });
 
 const stateMachineLogGroup = new logs.LogGroup(this, 'StateMachineLogGroup', {
   logGroupName: `/aws/stepfunctions/${config.name}`,
   retention: logs.RetentionDays.ONE_WEEK,
+  removalPolicy: cdk.RemovalPolicy.DESTROY,
 });
 ```
 
 ### Viewing Logs
 1. **Lambda Logs**: `/aws/lambda/WorkflowLambda`
 2. **Step Function Logs**: `/aws/stepfunctions/DataMigrationWorkflow`
+
+### Lambda Logging Permissions
+The Lambda function has explicit CloudWatch Logs permissions:
+
+**📍 Code Reference:**
+```typescript
+// apps/infrastructure/lib/infrastructure-stack.ts - Line 75
+workflowLambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    effect: iam.Effect.ALLOW,
+    actions: [
+      'logs:CreateLogGroup',
+      'logs:CreateLogStream',
+      'logs:PutLogEvents',
+      'logs:DescribeLogGroups',
+      'logs:DescribeLogStreams',
+    ],
+    resources: [
+      lambdaLogGroup.logGroupArn,
+      `${lambdaLogGroup.logGroupArn}:*`,
+    ],
+  })
+);
+```
 
 ## 🔧 Configuration
 
@@ -283,7 +308,7 @@ const eventBridgeConfig: EventBridgeConfig = {
 ### Modify Workflow Logic
 **📍 Code Reference:**
 ```typescript
-// packages/lambda-handlers/src/index.ts - Line 35
+// packages/lambda-handlers/src/index.ts - Line 37
 const executeWorkflow = async (input: WorkflowInput): Promise<WorkflowOutput> => {
   // Add your custom business logic here
   console.log('Executing data migration workflow', { 
@@ -304,13 +329,35 @@ const executeWorkflow = async (input: WorkflowInput): Promise<WorkflowOutput> =>
 };
 ```
 
+### Types and Interfaces
+Shared types are defined in the types package:
+
+**📍 Code Reference:**
+```typescript
+// packages/types/src/index.ts
+export interface WorkflowInput {
+  readonly executionId: string;
+  readonly timestamp: string;
+  readonly data?: Record<string, unknown>;
+}
+
+export interface WorkflowOutput {
+  readonly success: boolean;
+  readonly executionId: string;
+  readonly timestamp: string;
+  readonly result?: Record<string, unknown>;
+  readonly error?: string;
+}
+```
+
 ## 🎯 Key Benefits
 
 - **Simple**: Self-contained Lambda function with no external dependencies
-- **Reliable**: Built-in retry logic and error handling
-- **Observable**: CloudWatch logging for monitoring
-- **Cost-effective**: Pay only for execution time
+- **Reliable**: Built-in retry logic and error handling in Step Functions
+- **Observable**: CloudWatch logging for monitoring and debugging
+- **Cost-effective**: Pay only for execution time, 1-week log retention
 - **Maintainable**: Clean TypeScript code with strong typing
+- **Scalable**: EventBridge + Step Functions handle concurrent executions
 
 ## 🔄 Development Workflow
 
@@ -335,4 +382,18 @@ aws logs tail /aws/lambda/WorkflowLambda --follow
 cd apps/infrastructure && npx cdk destroy
 ```
 
-This removes all created resources including Lambda functions, Step Functions, EventBridge rules, and CloudWatch log groups.
+This removes all created resources including:
+- Lambda functions
+- Step Functions state machine
+- EventBridge rules
+- CloudWatch log groups
+- IAM roles and policies
+
+## 🏗️ Infrastructure Components
+
+### AWS Resources Created:
+1. **Lambda Function**: Executes the workflow logic
+2. **Step Function**: Orchestrates the workflow with error handling
+3. **EventBridge Rule**: Triggers execution every 5 minutes
+4. **CloudWatch Log Groups**: Centralized logging for Lambda and Step Functions
+5. **IAM Roles**: Least-privilege permissions for each service

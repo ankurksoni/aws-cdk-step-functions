@@ -102,33 +102,4 @@ export const workflowHandler: Handler<WorkflowInput, WorkflowOutput> = async (
       error: errorMessage,
     };
   }
-};
-
-// Trigger handler for EventBridge
-export const triggerHandler: Handler = async (event, context) => {
-  try {
-    console.log('EventBridge trigger received', {
-      event,
-      requestId: context.awsRequestId,
-    });
-
-    // Generate execution ID and create workflow input
-    const workflowInput: WorkflowInput = {
-      executionId: context.awsRequestId,
-      timestamp: new Date().toISOString(),
-      data: {
-        triggerSource: 'EventBridge',
-        scheduledTime: event.time,
-      },
-    };
-
-    return workflowInput;
-  } catch (error) {
-    console.error('Trigger handler failed', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      requestId: context.awsRequestId,
-    });
-    
-    throw error;
-  }
 }; 
