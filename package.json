@@ -8,6 +8,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "clean": "turbo run clean",
+    "cdk:bootstrap": "cd apps/infrastructure && npx cdk bootstrap",
     "cdk:synth": "cd apps/infrastructure && npm run cdk synth",
     "cdk:deploy": "cd apps/infrastructure && npm run cdk deploy",
     "cdk:destroy": "cd apps/infrastructure && npm run cdk destroy",
