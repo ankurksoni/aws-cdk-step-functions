@@ -45,10 +45,27 @@ export class InfrastructureStack extends cdk.Stack {
       value: workflowLambda.functionName,
       description: 'Name of the workflow Lambda function',
     });
+
+    new cdk.CfnOutput(this, 'LambdaLogGroupName', {
+      value: workflowLambda.logGroup?.logGroupName || '',
+      description: 'CloudWatch log group for Lambda function',
+    });
+
+    new cdk.CfnOutput(this, 'StateMachineLogGroupName', {
+      value: `/aws/stepfunctions/${stepFunctionConfig.name}`,
+      description: 'CloudWatch log group for Step Functions',
+    });
   }
 
   // Single Responsibility: Lambda creation
   private createWorkflowLambda(): lambda.Function {
+    // Create dedicated log group for the Lambda function
+    const lambdaLogGroup = new logs.LogGroup(this, 'WorkflowLambdaLogGroup', {
+      logGroupName: '/aws/lambda/WorkflowLambda',
+      retention: logs.RetentionDays.ONE_WEEK,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     const workflowLambda = new lambda.Function(this, 'WorkflowLambda', {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: 'index.workflowHandler',
@@ -57,22 +74,26 @@ export class InfrastructureStack extends cdk.Stack {
       memorySize: 512,
       environment: {
         NODE_ENV: 'production',
-        LOG_LEVEL: 'INFO',
       },
-      // Enhanced monitoring and tracing
-      tracing: lambda.Tracing.ACTIVE,
-      logRetention: logs.RetentionDays.ONE_WEEK,
+      // Use the dedicated log group
+      logGroup: lambdaLogGroup,
     });
 
-    // Add necessary permissions for Lambda Powertools
+    // Add explicit CloudWatch Logs permissions
     workflowLambda.addToRolePolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
         actions: [
-          'xray:PutTraceSegments',
-          'xray:PutTelemetryRecords',
+          'logs:CreateLogGroup',
+          'logs:CreateLogStream',
+          'logs:PutLogEvents',
+          'logs:DescribeLogGroups',
+          'logs:DescribeLogStreams',
         ],
-        resources: ['*'],
+        resources: [
+          lambdaLogGroup.logGroupArn,
+          `${lambdaLogGroup.logGroupArn}:*`,
+        ],
       })
     );
 
@@ -84,6 +105,13 @@ export class InfrastructureStack extends cdk.Stack {
     workflowLambda: lambda.Function,
     config: StepFunctionConfig
   ): stepfunctions.StateMachine {
+    // Create dedicated log group for Step Functions
+    const stateMachineLogGroup = new logs.LogGroup(this, 'StateMachineLogGroup', {
+      logGroupName: `/aws/stepfunctions/${config.name}`,
+      retention: logs.RetentionDays.ONE_WEEK,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     // Define the workflow steps
     const startWorkflow = new sfnTasks.LambdaInvoke(this, 'StartWorkflow', {
       lambdaFunction: workflowLambda,
@@ -116,22 +144,16 @@ export class InfrastructureStack extends cdk.Stack {
           .otherwise(errorHandler)
       );
 
-    // Create the state machine
+    // Create the state machine with logging
     const stateMachine = new stepfunctions.StateMachine(this, 'DataMigrationStateMachine', {
-      definition,
+      definitionBody: stepfunctions.DefinitionBody.fromChainable(definition),
       stateMachineName: config.name,
       timeout: cdk.Duration.seconds(config.timeout),
-      // Enhanced logging
       logs: {
-        destination: new logs.LogGroup(this, 'StateMachineLogGroup', {
-          logGroupName: `/aws/stepfunctions/${config.name}`,
-          retention: logs.RetentionDays.ONE_WEEK,
-        }),
+        destination: stateMachineLogGroup,
         level: stepfunctions.LogLevel.ALL,
         includeExecutionData: true,
       },
-      // Enable X-Ray tracing
-      tracingEnabled: true,
     });
 
     return stateMachine;

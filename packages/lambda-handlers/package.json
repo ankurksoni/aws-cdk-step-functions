@@ -15,12 +15,7 @@
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "@repo/types": "*",
-    "@repo/step-function-core": "*",
-    "@aws-lambda-powertools/logger": "^1.17.0",
-    "@aws-lambda-powertools/tracer": "^1.17.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@repo/typescript-config": "*",
     "@types/aws-lambda": "^8.10.119",
